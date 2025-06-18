@@ -1,9 +1,11 @@
 from openai import OpenAI
-from prompts import *
+from prompts1 import *
 from utils import WIKIDATA_ENTITY, search_entity_from_wikidata
 import re, os, toml
 from typing import List
+import json
 from pprint import pprint
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(SCRIPT_DIR, "config.toml")
@@ -27,10 +29,7 @@ def llm_generate(messages: List):
     messages=messages,
     temperature=0.7,
     top_p=0.8,
-    max_tokens=4096,
-    extra_body={
-        "repetition_penalty": 1.05,
-    },
+    max_tokens=2048
     )
     return chat_response.choices[0].message.content
 
@@ -41,6 +40,14 @@ MSGS = [
     {"role": "assistant", "content": assistant_1},
     {"role": "user", "content": user_2},
     {"role": "assistant", "content": assistant_2},
+    {"role": "user", "content": user_3},
+    {"role": "assistant", "content": assistant_3},
+    {"role": "user", "content": user_4},
+    {"role": "assistant", "content": assistant_4},
+    {"role": "user", "content": user_7},
+    {"role": "assistant", "content": assistant_7},
+    {"role": "user", "content": user_8},
+    {"role": "assistant", "content": assistant_8}
 ]
 
 
@@ -118,10 +125,69 @@ def entity_linking(sentence: str):
     response = llm_generate(result_msg)
     msgs = add_assistant_response(result_msg, response)
     indices = parser(response)
-    return [result_list[idx] for idx in indices], msgs
+
+    if not indices or not all(isinstance(i, int) for i in indices):
+        return [], msgs
+
+    valid_indices = []
+    for idx in indices:
+        if 0 <= idx < len(result_list):
+            valid_indices.append(idx)
+        else:
+            print(f"Index {idx} is out of range (0 ~ {len(result_list) - 1})")
+
+    return [result_list[idx] for idx in valid_indices], msgs
 
 
 if __name__ == "__main__":
-    sentence = "Where was the place of death of Anastasia Of Serbia's husband?"
-    result = entity_linking(sentence)
-    print(result)
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    with open("/u/luoyajie/entity_linking/data/dev_1000.json", "r", encoding="utf-8") as f:
+        dev_data = json.load(f)
+
+    def process_sample(sample):
+        question = sample["question"]
+        gold_qids = set(sample["topic_entity"])
+        predicted_entities, msgs = entity_linking(question)
+        predicted_qids = set(e.qid for e in predicted_entities)
+        is_correct = gold_qids ==  predicted_qids
+        tp = len(gold_qids & predicted_qids)
+        recall = tp / len(gold_qids) if gold_qids else 0
+        precision = tp / len(predicted_qids) if predicted_qids else 0
+        return {
+            "_id": sample["_id"],
+            "question": question,
+            "gold_id": list(gold_qids),
+            "predicted_id": list(predicted_qids),
+            "correct": is_correct,
+            "recall": recall,
+            "precision": precision,
+            "llm_messages": msgs
+        }
+
+    results = []
+    max_workers = 20  
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(process_sample, sample) for sample in dev_data]
+        for future in as_completed(futures):
+            result = future.result()
+            results.append(result)
+            print(f"\n==== Question: {result['question']} ====")
+            print(f"Predicted_id: {result['predicted_id']}")
+            print(f"Gold_id: {result['gold_id']}")
+            print(f"Correct: {result['correct']}")
+            print(f"LLM_messages: {result['llm_messages']}")
+
+    output_path = "/u/luoyajie/entity_linking/results/dev1000.json"
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(results, f, indent=2, ensure_ascii=False)
+
+    accuracy = sum(1 for r in results if r["gold_id"] == r["predicted_id"]) / len(results)
+    avg_recall = sum(r["recall"] for r in results) / len(results)
+    avg_precision = sum(r["precision"] for r in results) / len(results)
+
+    print(f"\nAccuracy: {accuracy:.2%}")
+    print(f"Avg Recall: {avg_recall:.2%}")
+    print(f"Avg Precision: {avg_precision:.2%}")
