@@ -7,4 +7,10 @@ api_base = "http://localhost:8722/v1"
 # use finetuned model
 if_ft = true
 name = "Qwen/Qwen2.5-7B-Instruct"
-topk = 10
+topk = 50
+
+[exp]
+dataset = "2wiki"
+# split should be in ["train", "dev", "test"]
+split = "dev"
+num_workers = 20
