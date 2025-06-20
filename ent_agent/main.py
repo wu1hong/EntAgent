@@ -4,6 +4,7 @@ from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from entity_linking import entity_linking
 import toml
+import random
 
 
 def process_sample(sample):
@@ -33,9 +34,13 @@ if __name__ == "__main__":
     split = config['exp']['split']
     topk = config['model']['topk']
     num_workers = config['exp']['num_workers']
+    num_data = config['exp']['num_data']
     model = config['model']['name']
-    with open(f"./datasets/{dataset}/{split}.json", "r", encoding="utf-8") as f:
+    with open(f"./data/{dataset}/{split}.json", "r", encoding="utf-8") as f:
         data = json.load(f)
+    seed = 42
+    random.seed(seed)
+    data = random.sample(data, num_data)
 
     results = []
     with ThreadPoolExecutor(max_workers=num_workers) as executor:

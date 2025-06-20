@@ -12,7 +12,7 @@ def process_2wiki_helper(split:str):
     """
     dataset_name = '2wiki'
 
-    file_path = f"./datasets/{dataset_name}/{split}.json"
+    file_path = f"./{dataset_name}/{split}.json"
     with open(file_path, 'r') as f:
         datas = json.load(f)
     
