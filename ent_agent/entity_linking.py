@@ -64,11 +64,8 @@ def add_result_list(messages: List, result_list: List[WIKIDATA_ENTITY]) -> List:
         qid = entity.qid
         label = entity.label
         desc = entity.desc
-        text += f"""[{i}] {{
-            "qid": "{qid}",
-            "label": "{label}",
-            "desc": "{desc}"
-        }}\n"""
+        text += f"""[{i}]
+            {label}: {desc}\n"""
     messages.append({"role": "user", "content": text})
     return messages
 
