@@ -74,7 +74,8 @@ trainer = SFTTrainer(
     model=model,
     args=training_args,
     train_dataset=dataset,
-    formatting_func=formatting_func,
+    packing=False,
+    formatting_func=formatting_func
 )
 trainer.train()
 trainer.save_model(output_dir)
