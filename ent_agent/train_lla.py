@@ -22,7 +22,7 @@ tokenizer.padding_side = "right"
 tokenizer.model_max_length = 2048
 
 # Set up 8-bit quantization config
-bnb_config = BitsAndBytesConfig(load_in_8bit=True)
+#bnb_config = BitsAndBytesConfig(load_in_8bit=True)
 model = AutoModelForCausalLM.from_pretrained(
     model_name,
     torch_dtype=torch.bfloat16,
