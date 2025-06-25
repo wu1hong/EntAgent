@@ -33,6 +33,7 @@ if __name__ == "__main__":
     dataset = config['exp']['dataset']
     split = config['exp']['split']
     topk = config['model']['topk']
+    source = config['model']['source']
     num_workers = config['exp']['num_workers']
     num_data = config['exp']['num_data']
     model = config['model']['name']
@@ -52,9 +53,9 @@ if __name__ == "__main__":
             print(f"Predicted_id: {result['predicted_id']}")
             print(f"Gold_id: {result['gold_id']}")
             print(f"Correct: {result['correct']}")
-            print(f"LLM_messages: {result['llm_messages']}")
+            # print(f"LLM_messages: {result['llm_messages']}")
 
-    output_path = f"./results/{model}_{split}.json"
+    output_path = f"./results/{model}_{split}_{source}.json"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)

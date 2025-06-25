@@ -6,11 +6,14 @@ api_base = "http://localhost:8722/v1"
 [model]
 # use finetuned model
 if_ft = true
-name = "Qwen/Qwen2.5-7B-Instruct"
+name = "meta-llama/Llama-3.3-70B-Instruct"
 topk = 50
+# ['wikidata', 'wikipedia']
+source = 'wikipedia'
 
 [exp]
 dataset = "2wiki"
 # split should be in ["train", "dev", "test"]
 split = "dev"
 num_workers = 20
+num_data = 1000

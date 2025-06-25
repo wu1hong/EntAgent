@@ -1,6 +1,7 @@
 import requests
 from typing import List
 from bs4 import BeautifulSoup
+import wikipedia
 
 
 class WIKIDATA_ENTITY:
@@ -82,7 +83,8 @@ def from_wikipedia_title_to_wikidata_entity(title: str) -> WIKIDATA_ENTITY:
     """
     Return the WIKIDATA_ENTITY class given the Wikipedia title.
     """
-    url = f"https://en.wikipedia.org/wiki/{title}"
+    # title = title.replace("_", " ")
+    url = f"https://en.wikipedia.org/wiki/{title}"    
     response = requests.get(url)
     html_text = response.text
     soup = BeautifulSoup(html_text, 'html.parser')
@@ -94,11 +96,41 @@ def from_wikipedia_title_to_wikidata_entity(title: str) -> WIKIDATA_ENTITY:
     if link:
         href = link.get('href')
         q_number = href.split('/')[-1]
-        print(q_number)
     else:
         print("Wikidata link not found")
+
+    return [get_wikidata_entity_from_qid(q_number)]
+
+
+def search_entity_from_wikipedia(query: str, topk: int = 3, num_sentences: int = 1) -> list[WIKIDATA_ENTITY]:
+    # print(f"Searching for {query} from Wikipedia...")
+    search_list = wikipedia.search(query, results=topk)
+    page_list = []
+    for title in search_list:
+        try:
+            page = wikipedia.page(title, auto_suggest=False)
+            page_list.append(page)
+        except wikipedia.exceptions.DisambiguationError as error:
+            # print(f"Error: {error}")
+            for option in error.options[:topk]:
+                try:
+                    page = wikipedia.page(option, auto_suggest=False)
+                    page_list.append(page)
+                except Exception as e:
+                    # print(f"Error: {e}")
+                    continue
     
-    return get_wikidata_entity_from_qid(q_number)
+    entity_list = []
+    for page in page_list:
+        response = requests.get(page.url)
+        html_text = response.text
+        soup = BeautifulSoup(html_text, 'html.parser')
+        link = soup.select_one('#t-wikibase a')
+        href = link.get('href')
+        q_number = href.split('/')[-1]
+        entity_list.append(WIKIDATA_ENTITY(q_number, page.title, '\n'.join(page.summary.split('\n')[:num_sentences])))
+    
+    return entity_list
 
 
 if __name__ == "__main__":
@@ -107,7 +139,15 @@ if __name__ == "__main__":
     # for entity in result_list:
     #     print(entity)
 
-    name = "Polish-Russian_War_(film)"
-    result = from_wikipedia_title_to_wikidata_entity(name)
-    print(result)
+    name = "Polish-Russian War (film)"
+    # result = from_wikipedia_title_to_wikidata_entity(name)
+    name = "Les Films Du Losange"
+    name = "Count Of St. Germain"
+    name = "Aylwin (Film)"
+    name = "It'S In The Air"
+    name = "Once A Gentleman"
+    name = "The Girl In White"
+    name = "Charles Bretagne Marie De La Trémoille"
+    result = search_entity_from_wikipedia(name)
+
     breakpoint()
