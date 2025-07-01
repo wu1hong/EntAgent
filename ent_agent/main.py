@@ -44,16 +44,32 @@ if __name__ == "__main__":
     data = random.sample(data, num_data)
 
     results = []
+    running_accuracy = 0
+    running_recall = 0
+    running_precision = 0
     with ThreadPoolExecutor(max_workers=num_workers) as executor:
         futures = [executor.submit(process_sample, sample) for sample in data]
         for future in tqdm(as_completed(futures), total=len(data), desc="Processing samples"):
             result = future.result()
             results.append(result)
+            # Update running metrics
+            running_accuracy += (1 if result['correct'] else 0)
+            running_recall += result['recall']
+            running_precision += result['precision']
+            current_count = len(results)
+            
+            # Calculate current averages
+            current_accuracy = running_accuracy / current_count
+            current_recall = running_recall / current_count
+            current_precision = running_precision / current_count
+            
             print(f"\n==== Question: {result['question']} ====")
             print(f"Predicted_id: {result['predicted_id']}")
             print(f"Gold_id: {result['gold_id']}")
             print(f"Correct: {result['correct']}")
-            # print(f"LLM_messages: {result['llm_messages']}")
+            print(f"Running Accuracy: {current_accuracy:.2%}")
+            print(f"Running Recall: {current_recall:.2%}")
+            print(f"Running Precision: {current_precision:.2%}")
 
     output_path = f"./results/{model}_{split}_{source}.json"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
