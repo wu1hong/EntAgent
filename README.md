@@ -1,5 +1,17 @@
 # EntAgent
 
+## Install
+Run command ```pip install -r requirements.txt``` to install necessary libraries.
+Use the following command to install [ScalableVectorSearch](https://github.com/intel/ScalableVectorSearch), a vector search library and a replacement for Faiss.
+
+```
+# Install SVS for indexing (feel free to install on your customized dir) 
+git clone https://github.com/intel/ScalableVectorSearch
+cd ScalableVectorSearch
+# Install svs using pip (don't use uv pip)
+pip install bindings/python
+```
+
 ## Data Preprocess
 Use the following command to download datasets:
 
@@ -11,5 +23,5 @@ Use the following command to preprocess datasets under the ```data``` folder
 
 ## Inference
 1. Modify the ```config.toml``` file in ```ent_agent``` folder
-2. Launch Vllm with command ```bash serve.sh```
+2. Launch vLLM with command ```bash serve.sh```
 3. Run command ```python main.py```
