@@ -2,11 +2,26 @@ import requests
 from typing import List
 from bs4 import BeautifulSoup
 import wikipedia
+import toml
+import os
+import bm25s
+import Stemmer
+import json
+import svs
+from FlagEmbedding import FlagModel
+
+
+CONFIG_PATH = os.path.join(".", "config.toml")
+with open(CONFIG_PATH, "r") as f:
+    config = toml.load(f)
+DATASET = config["exp"]["dataset"]
+MODEL_NAME = "BAAI/bge-large-en-v1.5"
+DEVICE = "cuda:0"
 
 
 class WIKIDATA_ENTITY:
     # data type for wikidata entity
-    def __init__(self, qid, label, desc) -> None:
+    def __init__(self, qid, label, desc, doc=None) -> None:
         """
         qid: wikidata QID, e.g., Q16204382
         label: label of the entity, e.g., Michael Lent
@@ -15,6 +30,7 @@ class WIKIDATA_ENTITY:
         self.qid = qid if qid else None
         self.label = label if label else None
         self.desc = desc if desc else None
+        self.doc = doc if doc else None
     
     def __repr__(self):
         text = f"QID: {self.qid}\nLabel: {self.label}\nDescription: {self.desc}\n"
@@ -133,6 +149,74 @@ def search_entity_from_wikipedia(query: str, topk: int = 3, num_sentences: int =
     return entity_list
 
 
+class DenseRetriever:
+    def __init__(self, index_dir: str, dict_path: str):
+        self.index = svs.Vamana(
+            os.path.join(index_dir, "triviaqa_text_config"),
+            svs.GraphLoader(os.path.join(index_dir, "triviaqa_text_graph")),
+            svs.VectorDataLoader(
+                os.path.join(index_dir, "triviaqa_text_data"), svs.DataType.float32
+            ),
+            svs.DistanceType.L2,
+            num_threads = 4,
+        )
+        self.index.search_window_size = 30
+        self.encoder = FlagModel(MODEL_NAME, use_fp16=False, device=DEVICE)
+        with open(dict_path, 'r') as f:
+            self.text_dict = json.load(f)
+        self.titles = list(self.text_dict.keys())
+    
+    def search(self, query: str, topk: int = 10):
+        query_embedding = self.encoder.encode(query)
+        indices, _ = self.index.search(query_embedding, topk)
+        titles = [self.titles[index] for index in indices[0]]
+        documents = [self.text_dict[title] for title in titles]
+        descriptions = [self.text_dict[title].split("\n\n")[0] for title in titles]
+        res_list = [WIKIDATA_ENTITY(None, title, description, doc=doc) for title, description, doc in zip(titles, descriptions, documents)]
+        return res_list
+
+
+class BM25Retriever:
+    def __init__(self, index_dir: str, dict_path: str):
+        self.index_dir = index_dir
+        self.dict_path = dict_path
+        self.stemmer = Stemmer.Stemmer("english")
+        self.retriever = bm25s.BM25.load(index_dir, load_corpus=True)
+        with open(dict_path, 'r') as f:
+            self.text_dict = json.load(f)
+        self.titles = list(self.text_dict.keys())
+
+    def search(self, query: str, topk: int = 10):
+        if query in self.titles:
+            return [WIKIDATA_ENTITY(None, query, self.text_dict[query].split("\n\n")[0], doc=self.text_dict[query])]
+        query_tokens = bm25s.tokenize(query, stemmer=self.stemmer)
+        results, scores = self.retriever.retrieve(query_tokens, k=topk)
+        titles = [self.titles[res] for res in results[0]]
+        documents = [self.text_dict[title] for title in titles]
+        descriptions = [self.text_dict[title].split("\n\n")[0] for title in titles]
+        res_list = [WIKIDATA_ENTITY(None, title, description, doc=doc) for title, description, doc in zip(titles, descriptions, documents)]
+        return res_list
+
+
+if DATASET == "TriviaQA":
+    dense_index_dir = os.path.join(".", "data", "TriviaQA", "dense_index")
+    bm25_index_dir = os.path.join(".", "data", "TriviaQA", "bm25_index")
+    dict_path = os.path.join(".", "data", "TriviaQA", "text_dict.json")
+
+dense_retriever = DenseRetriever(dense_index_dir, dict_path)
+bm25_retriever = BM25Retriever(bm25_index_dir, dict_path)
+
+
+def search_entity_from_dense(query: str, topk: int = 10) -> list[WIKIDATA_ENTITY]:
+    res_list = dense_retriever.search(query, topk)
+    return res_list
+
+
+def search_entity_from_bm25(query: str, topk: int = 10) -> list[WIKIDATA_ENTITY]:
+    res_list = bm25_retriever.search(query, topk)
+    return res_list
+
+
 if __name__ == "__main__":
     # name = "La Leona"
     # result_list = search_entity_from_wikidata(name)
@@ -148,6 +232,17 @@ if __name__ == "__main__":
     name = "Once A Gentleman"
     name = "The Girl In White"
     name = "Charles Bretagne Marie De La Trémoille"
-    result = search_entity_from_wikipedia(name)
+    # result = search_entity_from_wikipedia(name)
+
+    # query = "Where in England was Dame Judi Dench born?"
+    name = "Judi Dench"
+    name = "Angola"
+    name = "Philips"
+    name = "Alfred Brendel"
+    name = "Which volcanoin Tanzaniais the highest mountain in Africa?"
+    # res = search_entity_from_dense(name)
+    name = "Michael Jackson"
+    name = "Melanie Molitor"
+    res = search_entity_from_bm25(name)
 
     breakpoint()

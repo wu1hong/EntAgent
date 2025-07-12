@@ -1,8 +1,10 @@
 from openai import OpenAI
-from utils import WIKIDATA_ENTITY, search_entity_from_wikidata, search_entity_from_wikipedia
+from utils import WIKIDATA_ENTITY, search_entity_from_wikidata, search_entity_from_wikipedia, search_entity_from_bm25, search_entity_from_dense
 import re, os, toml
 from typing import List
 from pprint import pprint
+from prompts import *
+
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(SCRIPT_DIR, "config.toml")
@@ -14,17 +16,15 @@ openai_api_base = config["openai"]["api_base"]
 MODEL = config["model"]["name"]
 TOPK = config["model"]["topk"]
 SOURCE = config["model"]["source"]
-
-# if SOURCE == "wikidata":
-#     from prompts import *
-# elif SOURCE == "wikipedia":
-#     from prompts_wikipedia import *
-from prompts import *
+IF_FT = config["model"]["if_ft"]
 
 openai_client = OpenAI(
         api_key=openai_api_key,
         base_url=openai_api_base,
     )
+# openai_client = OpenAI(
+#         api_key=openai_api_key,
+#     )
 
 
 def llm_generate(messages: List):
@@ -40,26 +40,31 @@ def llm_generate(messages: List):
     )
     return chat_response.choices[0].message.content
 
-
-MSGS = [
-    {"role": "system", "content": system_prompt},
-    {"role": "user", "content": user_1},
-    {"role": "assistant", "content": assistant_1},
-    {"role": "user", "content": user_2},
-    {"role": "assistant", "content": assistant_2},
-    {"role": "user", "content": user_3},
-    {"role": "assistant", "content": assistant_3},
-    {"role": "user", "content": user_4},
-    {"role": "assistant", "content": assistant_4},
-    {"role": "user", "content": user_5},
-    {"role": "assistant", "content": assistant_5},
-    {"role": "user", "content": user_6},
-    {"role": "assistant", "content": assistant_6},
-    {"role": "user", "content": user_7},
-    {"role": "assistant", "content": assistant_7},
-    {"role": "user", "content": user_8},
-    {"role": "assistant", "content": assistant_8},
-]
+if not IF_FT:
+    MSGS = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_1},
+        {"role": "assistant", "content": assistant_1},
+        {"role": "user", "content": user_2},
+        {"role": "assistant", "content": assistant_2},
+        {"role": "user", "content": user_3},
+        {"role": "assistant", "content": assistant_3},
+        {"role": "user", "content": user_4},
+        {"role": "assistant", "content": assistant_4},
+        {"role": "user", "content": user_5},
+        {"role": "assistant", "content": assistant_5},
+        {"role": "user", "content": user_6},
+        {"role": "assistant", "content": assistant_6},
+        {"role": "user", "content": user_7},
+        {"role": "assistant", "content": assistant_7},
+        {"role": "user", "content": user_8},
+        {"role": "assistant", "content": assistant_8},
+    ]
+else:
+    # MSGS = [
+    #     {"role": "system", "content": system_prompt},
+    # ]
+    MSGS = []
 
 
 def add_question(messages: List, sentence: str) -> List:
@@ -119,24 +124,29 @@ def parser(response: str):
         return None
 
 
-def search_func(entity_name: str, topk: int):
+def search_func(entity_name: str, topk: int, if_dense: bool = False):
     if SOURCE == "wikidata":
         _list = search_entity_from_wikidata(entity_name, topk=topk) # List[WIKIDATA_ENTITY]
     elif SOURCE == "wikipedia":
         _list = search_entity_from_wikipedia(entity_name, topk=3) # List[WIKIPEDIA_ENTITY]
+    elif SOURCE == "hybrid":
+        if if_dense:
+            _list = search_entity_from_dense(entity_name, topk=topk)
+        else:
+            _list = search_entity_from_bm25(entity_name, topk=topk)
     else:
         raise NotImplementedError(f"Source {SOURCE} is not supported.")
     return _list
 
 
-def entity_linking(sentence: str):
+def entity_linking(sentence: str, if_dense: bool = False):
     query_msg = add_question(MSGS, sentence)
     response = llm_generate(query_msg)
     search_entity = parser(response)
     result_list = []
     if search_entity is not None:
         for each in search_entity:
-            _list = search_func(each, topk=TOPK) # List[WIKIDATA_ENTITY]
+            _list = search_func(each, topk=TOPK, if_dense=if_dense) # List[WIKIDATA_ENTITY]
             result_list.extend(_list)
 
     # filter out results without description
@@ -174,6 +184,8 @@ if __name__ == "__main__":
     sentence = "Where was the place of death of Anastasia Of Serbia's husband?"
     sentence = "Where does the founder of Les Films Du Losange work at?"
     sentence = "Are director of film Susanna Whipped Cream and director of film Le Salamandre both from the same country?"
+    sentence = "Where in England was Dame Judi Dench born?"
+    sentence = "Melanie Molitor is the mom of which tennis world NO 1?"
     result = entity_linking(sentence)
     print(result)
     breakpoint()
