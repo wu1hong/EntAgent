@@ -41,7 +41,10 @@ if __name__ == "__main__":
         data = json.load(f)
     seed = 42
     random.seed(seed)
-    data = random.sample(data, num_data)
+    try:
+        data = random.sample(data, num_data)
+    except ValueError:
+        pass
 
     results = []
     running_accuracy = 0
@@ -71,7 +74,7 @@ if __name__ == "__main__":
             print(f"Running Recall: {current_recall:.2%}")
             print(f"Running Precision: {current_precision:.2%}")
 
-    output_path = f"./results/{model}_{split}_{source}.json"
+    output_path = f"./results/{model}__{dataset}__{split}_{source}.json"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
