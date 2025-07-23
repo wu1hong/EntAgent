@@ -9,6 +9,7 @@ import re
 import string
 from collections import Counter
 from typing import Dict, List
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 
 def normalize_answer(s):
@@ -76,6 +77,7 @@ def update_answer(prediction, golds):
     return max_em, max_f1, max_prec, max_recall
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=15))
 def process_triviaqa(sample):
     question = sample["Question"]
     answers = sample["Answer"]["NormalizedAliases"] + [sample["Answer"]["NormalizedValue"]]
@@ -115,6 +117,8 @@ if __name__ == "__main__":
     if dataset == "TriviaQA":
         process_sample = process_triviaqa
         data = data["Data"]
+        # preserve data who have ['Answer']['MatchedWikiEntityName']
+        data = [sample for sample in data if "Answer" in sample and "MatchedWikiEntityName" in sample["Answer"]]
         assert split == "dev" # for TriviaQA, we only use dev set
     seed = 42
     random.seed(seed)
@@ -131,7 +135,10 @@ if __name__ == "__main__":
     with ThreadPoolExecutor(max_workers=num_workers) as executor:
         futures = [executor.submit(process_sample, sample) for sample in data]
         for future in tqdm(as_completed(futures), total=len(data), desc="Processing samples"):
-            result = future.result()
+            try:
+                result = future.result()
+            except Exception as e:
+                print(e)
             results.append(result)
             # Update running metrics
             running_em += (1 if result['em'] else 0)

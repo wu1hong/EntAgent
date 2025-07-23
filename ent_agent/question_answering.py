@@ -154,7 +154,7 @@ if __name__ == "__main__":
     # res = entity_linking(question, if_dense=True)
     # question = "How old was Woody Herman when he founded his own orchestra?"
     answer, plain_msgs = plain_qa(question)
-    answer, jug_msgs, ent_msgs, qa_msgs = question_answering(question)
+    answer, jug_msgs, ent_msgs, qa_msgs, doc = question_answering(question)
     print(answer)
     # print(jug_msgs)
     # print(ent_msgs)

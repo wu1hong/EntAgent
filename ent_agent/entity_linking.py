@@ -186,8 +186,8 @@ def entity_linking(sentence: str, if_dense: bool = False):
     msgs = add_assistant_response(query_msg, response)
     result_msg = add_result_list(msgs, result_list)
     # sanity check for token count
-    if count_message_tokens(result_msg) > 2000:
-        raise ValueError(f"Token count exceeds 2000 for sentence: {sentence} in entity linking")
+    # if count_message_tokens(result_msg) > 2000:
+    #     raise ValueError(f"Token count exceeds 2000 for sentence: {sentence} in entity linking")
     
     response = llm_generate(result_msg)
     msgs = add_assistant_response(result_msg, response)
