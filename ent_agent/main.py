@@ -5,8 +5,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from entity_linking import entity_linking
 import toml
 import random
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 def process_sample(sample):
     question = sample["question"]
     gold_qids = set(sample["topic_entity"])
@@ -53,7 +55,11 @@ if __name__ == "__main__":
     with ThreadPoolExecutor(max_workers=num_workers) as executor:
         futures = [executor.submit(process_sample, sample) for sample in data]
         for future in tqdm(as_completed(futures), total=len(data), desc="Processing samples"):
-            result = future.result()
+            try:
+                result = future.result()
+            except Exception as e:
+                print(f"Error: {e}")
+                continue
             results.append(result)
             # Update running metrics
             running_accuracy += (1 if result['correct'] else 0)

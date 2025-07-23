@@ -4,6 +4,7 @@ import re, os, toml
 from typing import List
 from pprint import pprint
 from prompts import *
+import tiktoken
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -27,15 +28,35 @@ openai_client = OpenAI(
 #     )
 
 
+def count_message_tokens(messages: list, model: str = "gpt-4") -> int:
+    """Returns the number of tokens in a list of messages."""
+    try:
+        encoding = tiktoken.encoding_for_model(model)
+    except KeyError:
+        print("Warning: model not found. Using cl100k_base encoding.")
+        encoding = tiktoken.get_encoding("cl100k_base")
+
+    num_tokens = 0
+    for message in messages:
+        # Each message incurs a small overhead of tokens
+        num_tokens += 4 
+        for key, value in message.items():
+            num_tokens += len(encoding.encode(str(value)))
+            if key == "name":
+                num_tokens -= 1  # A specific rule for the 'name' field
+    num_tokens += 2  # Every reply is primed with <|im_start|>assistant
+    return num_tokens
+
+
 def llm_generate(messages: List):
     chat_response = openai_client.chat.completions.create(
     model=MODEL,
     messages=messages,
-    temperature=0.7,
-    top_p=0.8,
-    max_tokens=4096,
+    temperature=config["gen_param"]["temp"],
+    top_p=config["gen_param"]["top_p"],
+    max_tokens=config["gen_param"]["max_tokens"],
     extra_body={
-        "repetition_penalty": 1.05,
+        "repetition_penalty": config["gen_param"]["rep_penalty"],
     },
     )
     return chat_response.choices[0].message.content
@@ -143,6 +164,10 @@ def entity_linking(sentence: str, if_dense: bool = False):
     query_msg = add_question(MSGS, sentence)
     response = llm_generate(query_msg)
     search_entity = parser(response)
+    # sanity check
+    if len(search_entity) > 10:
+        raise ValueError(f"Too many entities: {search_entity}")
+    
     result_list = []
     if search_entity is not None:
         for each in search_entity:
@@ -154,9 +179,16 @@ def entity_linking(sentence: str, if_dense: bool = False):
 
     # filter out results without label
     # result_list = [e for e in result_list if e.label is not None]
+
+    # if not result_list:
+    #     return [], query_msg
     
     msgs = add_assistant_response(query_msg, response)
     result_msg = add_result_list(msgs, result_list)
+    # sanity check for token count
+    if count_message_tokens(result_msg) > 2000:
+        raise ValueError(f"Token count exceeds 2000 for sentence: {sentence} in entity linking")
+    
     response = llm_generate(result_msg)
     msgs = add_assistant_response(result_msg, response)
     indices = parser(response)
@@ -186,6 +218,10 @@ if __name__ == "__main__":
     sentence = "Are director of film Susanna Whipped Cream and director of film Le Salamandre both from the same country?"
     sentence = "Where in England was Dame Judi Dench born?"
     sentence = "Melanie Molitor is the mom of which tennis world NO 1?"
+    sentence = "What Canadian religion has a religious notable figure named Mary?"
+    sentence = "What language with the initials arn do Chilean people speak?"
+    sentence = "What is the capital of the state of California?"
+    sentence = "Where is the location of the country where the Greelandic language is spoken?"
     result = entity_linking(sentence)
     print(result)
     breakpoint()

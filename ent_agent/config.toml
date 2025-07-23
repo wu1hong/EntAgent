@@ -11,14 +11,20 @@ if_ft = false
 name = "meta-llama/Llama-3.1-8B-Instruct"
 # name = "/work/yihong/ckpt/checkpoint-1254"
 # name = "gpt-4.1"
-topk = 5
+topk = 10
 # ['wikidata', 'wikipedia', 'hybrid']
-source = 'hybrid'
+source = 'wikipedia'
 
 [exp]
 # dataset should be in ["2wiki", "WebQSP", "CWQ", "TriviaQA"]
-dataset = "TriviaQA"
+dataset = "CWQ"
 # split should be in ["train", "dev", "test"]
 split = "dev"
-num_workers = 1
+num_workers = 20
 num_data = 1000
+
+[gen_param]
+temp = 0.7
+top_p = 0.8
+max_tokens = 4096
+rep_penalty = 1.05
