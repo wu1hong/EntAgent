@@ -143,7 +143,7 @@ def question_answering(question: str, topk: int = 10):
         answer, qa_msgs = qa(question, ent_lst[0].doc, topk)
         doc = ent_lst[0].doc
     return answer, jug_msgs, ent_msgs, qa_msgs, doc
-    # return answer, [], [], qa_msgs, ent_lst[0].doc
+    # return answer, [], [], qa_msgs, doc
 
 
 if __name__ == "__main__":
