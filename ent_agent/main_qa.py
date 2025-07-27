@@ -77,7 +77,7 @@ def update_answer(prediction, golds):
     return max_em, max_f1, max_prec, max_recall
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=15))
+# @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=15))
 def process_triviaqa(sample):
     question = sample["Question"]
     answers = sample["Answer"]["NormalizedAliases"] + [sample["Answer"]["NormalizedValue"]]
@@ -85,16 +85,18 @@ def process_triviaqa(sample):
     em, f1, _, _ = update_answer(pred_ans, answers)
     from utils import bm25_retriever
     try:
-        gold_doc = bm25_retriever.text_dict[sample["Answer"]["MatchedWikiEntityName"]]
+        gold_doc_list = sample["EntityPages"]
+        title_list = [each["Title"] for each in gold_doc_list]
+        gold_doc = [bm25_retriever.text_dict[title] for title in title_list]
     except Exception as e:
         print(e)
-        gold_doc = ""
+        gold_doc = []
     return {
         "_id": sample["QuestionId"],
         "question": question,
         "pred_ans": pred_ans,
         "answers": answers,
-        "hit@1": gold_doc == doc,
+        "hit@1": doc in gold_doc,
         "em": em,
         "f1": f1,
         "jug_msgs": jug_msgs,

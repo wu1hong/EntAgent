@@ -9,6 +9,7 @@ import Stemmer
 import json
 import svs
 from FlagEmbedding import FlagModel
+import re
 
 
 CONFIG_PATH = os.path.join(".", "config.toml")
@@ -35,6 +36,16 @@ class WIKIDATA_ENTITY:
     def __repr__(self):
         text = f"QID: {self.qid}\nLabel: {self.label}\nDescription: {self.desc}\n"
         return text
+
+
+def normalize_text(text):
+    """Converts text to a clean set of words."""
+    # Convert to lowercase
+    text = text.lower()
+    # Remove content in parentheses (e.g., " (novel)", " (film)")
+    text = re.sub(r'\s*\([^)]*\)$', '', text)
+    # Split into words and return as a set for efficient comparison
+    return set(text.split())
 
 
 def search_entity_from_wikidata(query: str, topk: int = 20) -> list[WIKIDATA_ENTITY]:
@@ -142,7 +153,11 @@ def search_entity_from_wikipedia(query: str, topk: int = 3, num_sentences: int =
         html_text = response.text
         soup = BeautifulSoup(html_text, 'html.parser')
         link = soup.select_one('#t-wikibase a')
-        href = link.get('href')
+        try:
+            href = link.get('href')
+        except AttributeError as e:
+            print(f"Error: {e} in search_entity_from_wikipedia")
+            continue
         q_number = href.split('/')[-1]
         entity_list.append(WIKIDATA_ENTITY(q_number, page.title, '\n'.join(page.summary.split('\n')[:num_sentences])))
     
@@ -185,13 +200,21 @@ class BM25Retriever:
         with open(dict_path, 'r') as f:
             self.text_dict = json.load(f)
         self.titles = list(self.text_dict.keys())
+        # create a bm25 index for titles
+        # Tokenize the corpus and only keep the ids (faster and saves memory)
+        corpus_tokens = bm25s.tokenize(self.titles, stopwords="en", stemmer=self.stemmer)
+        self.title_retriever = bm25s.BM25()
+        self.title_retriever.index(corpus_tokens)
 
     def search(self, query: str, topk: int = 10):
-        if query in self.titles:
-            return [WIKIDATA_ENTITY(None, query, self.text_dict[query].split("\n\n")[0], doc=self.text_dict[query])]
+        # if query in self.titles:
+        #     return [WIKIDATA_ENTITY(None, query, self.text_dict[query].split("\n\n")[0], doc=self.text_dict[query])]
+        # query_tokens = bm25s.tokenize(query, stemmer=self.stemmer)
+        # results, scores = self.retriever.retrieve(query_tokens, k=topk)
         query_tokens = bm25s.tokenize(query, stemmer=self.stemmer)
-        results, scores = self.retriever.retrieve(query_tokens, k=topk)
-        titles = [self.titles[res] for res in results[0]]
+        title_indices, _ = self.title_retriever.retrieve(query_tokens, k=topk)
+        titles = [self.titles[idx] for idx in title_indices[0]]
+        # titles = [self.titles[res] for res in results[0]]
         documents = [self.text_dict[title] for title in titles]
         descriptions = [self.text_dict[title].split("\n\n")[0] for title in titles]
         res_list = [WIKIDATA_ENTITY(None, title, description, doc=doc) for title, description, doc in zip(titles, descriptions, documents)]
@@ -202,9 +225,8 @@ if DATASET == "TriviaQA":
     dense_index_dir = os.path.join(".", "data", "TriviaQA", "dense_index")
     bm25_index_dir = os.path.join(".", "data", "TriviaQA", "bm25_index")
     dict_path = os.path.join(".", "data", "TriviaQA", "text_dict.json")
-
-dense_retriever = DenseRetriever(dense_index_dir, dict_path)
-bm25_retriever = BM25Retriever(bm25_index_dir, dict_path)
+    dense_retriever = DenseRetriever(dense_index_dir, dict_path)
+    bm25_retriever = BM25Retriever(bm25_index_dir, dict_path)
 
 
 def search_entity_from_dense(query: str, topk: int = 10) -> list[WIKIDATA_ENTITY]:
@@ -242,7 +264,7 @@ if __name__ == "__main__":
     name = "Which volcanoin Tanzaniais the highest mountain in Africa?"
     # res = search_entity_from_dense(name)
     name = "Michael Jackson"
-    name = "Melanie Molitor"
+    # name = "Melanie Molitor"
     res = search_entity_from_bm25(name)
 
     breakpoint()
