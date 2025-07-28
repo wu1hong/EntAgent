@@ -2,7 +2,7 @@ import os
 import json
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from question_answering import question_answering, plain_qa
+from question_answering import question_answering
 import toml
 import random
 import re
