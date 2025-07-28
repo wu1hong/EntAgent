@@ -139,8 +139,10 @@ if __name__ == "__main__":
         for future in tqdm(as_completed(futures), total=len(data), desc="Processing samples"):
             try:
                 result = future.result()
+                results.append(result)
             except Exception as e:
                 print(e)
+                continue
             results.append(result)
             # Update running metrics
             running_em += (1 if result['em'] else 0)
