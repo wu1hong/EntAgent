@@ -6,7 +6,8 @@ from prompts_qa import *
 from entity_linking import entity_linking
 from FlagEmbedding import FlagModel
 import torch
-
+import tiktoken
+from utils2 import search_entity_from_bm25, search_entity_from_dense
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(SCRIPT_DIR, "config.toml")
@@ -16,10 +17,12 @@ with open(CONFIG_PATH, "r") as f:
 openai_api_key = config["openai"]["api_key"]
 openai_api_base = config["openai"]["api_base"]
 MODEL = config["model"]["name"]
+DATASET = config["exp"]["dataset"]
 TOPK = config["model"]["topk"]
 SOURCE = config["model"]["source"]
 IF_FT = config["model"]["if_ft"]
-MODEL_NAME = "BAAI/bge-large-en-v1.5"
+METHOD = config["model"]["method"]
+MODEL_NAME = config["dense_model"]["dense_name"]
 DEVICE = "cuda:0"
 
 openai_client = OpenAI(
@@ -34,7 +37,7 @@ def llm_generate(messages: List):
     messages=messages,
     temperature=0.7,
     top_p=0.8,
-    max_tokens=4096,
+    max_tokens= 2048,
     extra_body={
         "repetition_penalty": 1.05,
     },
@@ -42,45 +45,40 @@ def llm_generate(messages: List):
     return chat_response.choices[0].message.content
 
 
-JUG_MSGS = [
-    {"role": "system", "content": jug_system_prompt},
-    {"role": "user", "content": jug_user1},
-    {"role": "assistant", "content": jug_ass1},
-    {"role": "user", "content": jug_user2},
-    {"role": "assistant", "content": jug_ass2},
-]
-
 QA_MSGS = [
     {"role": "system", "content": qa_system_prompt},
 ]
 
 
-def jug_qa(question: str) -> tuple[bool, List]:
-    messages = JUG_MSGS.copy()
-    messages.append({"role": "user", "content": question})
+def qa_popqa(question: str, context: str):
+    messages = QA_MSGS.copy()
+    context = context[:7000]
+
+    text = f"Question: {question}\nContext: {context}"
+    messages.append({"role": "user", "content": text})
+
     response = llm_generate(messages)
-    # extract the answer from <answer> tag
+
     try:
-        answer = re.search(r"<answer>(.*)</answer>", response).group(1)
+        answer = re.search(r"<answer>(.*?)</answer>", response, re.DOTALL).group(1).strip()
     except AttributeError:
-        print("No <answer> tag in the response")
+        print(" No <answer> tag in the response.")
         answer = "N/A"
+
     messages.append({"role": "assistant", "content": response})
-    return answer.strip() == "yes", messages
+    return answer, messages
 
 
-# to avoid loading model on every device; a feature of FlagModel?
 class Reranker:
     def __init__(self, model_name: str, device: str):
         self.reranker = FlagModel(model_name, use_fp16=True, device=device)
-    
+
     def encode(self, passages: List[str]) -> torch.Tensor:
         return self.reranker.encode(passages)
 
 reranker = Reranker(MODEL_NAME, DEVICE)
 
-
-def qa(question: str, context: str, topk: int = 3) -> str:
+def qa_triviaqa(question: str, context: str, topk: int = 3):
     passages = context.split("\n\n")
     _passages = [passage.strip() for passage in passages if passage.strip()] + [question]
     vectors = reranker.encode(_passages)
@@ -103,6 +101,7 @@ def qa(question: str, context: str, topk: int = 3) -> str:
     return answer.strip(), messages
 
 
+
 def plain_qa(question: str) -> str:
     messages = [{"role": "system", "content": plain_qa_system_prompt}]
     messages.append({"role": "user", "content": question})
@@ -116,47 +115,54 @@ def plain_qa(question: str) -> str:
     return answer.strip(), messages
 
 
+
 def question_answering(question: str, topk: int = 10):
-    not_use_dense, jug_msgs = jug_qa(question)
-    if not_use_dense:
-        ent_lst, ent_msgs = entity_linking(question, if_dense=False)
+
+    if DATASET == "PopQA":
+        qa = qa_popqa
+    elif DATASET == "TriviaQA":
+        qa = qa_triviaqa
     else:
-        ent_lst, ent_msgs = entity_linking(question, if_dense=True)
+        raise ValueError(f"Unsupported dataset for QA: {DATASET}")
 
-    # baseline
-    # ent_lst = []
+    ent_lst = []
+    ent_msgs = []
+    if METHOD == "baseline":
+        pass
+    elif METHOD == "BM25":
+        ent_lst = search_entity_from_bm25(question, topk)
 
-    # bm25 search
-    # from utils import search_entity_from_bm25
-    # ent_lst = search_entity_from_bm25(question, topk)
-    # answer, qa_msgs = qa(question, ent_lst[0].doc, topk)
+    elif METHOD == "dense":
+        ent_lst = search_entity_from_dense(question, topk)
 
-    # dense search
-    # from utils import search_entity_from_dense
-    # ent_lst = search_entity_from_dense(question, topk)
-    # answer, qa_msgs = qa(question, ent_lst[0].doc, topk)
+    elif METHOD == "EL":
+        ent_lst, ent_msgs = entity_linking(question, if_dense=False)
+        
+    else:
+        raise ValueError(f"Unsupported method: {METHOD}")
+
     
     if not ent_lst:
         answer, qa_msgs = plain_qa(question)
         doc = ""
     else:
-        answer, qa_msgs = qa(question, ent_lst[0].doc, topk)
+        answer, qa_msgs = qa(question, ent_lst[0].doc)
         doc = ent_lst[0].doc
-    return answer, jug_msgs, ent_msgs, qa_msgs, doc
-    # return answer, [], [], qa_msgs, doc
+
+    return answer, ent_msgs, qa_msgs, doc
+
 
 
 if __name__ == "__main__":
-    question = "What was the name of Michael Jackson's autobiography written in 1988?"
-    # not_use_dense, msgs = jug_qa(question)
+    question = "What is Frequency's occupation?"
     # print(not_use_dense)
     # res = entity_linking(question, if_dense=not not_use_dense)
     # res = entity_linking(question, if_dense=True)
     # question = "How old was Woody Herman when he founded his own orchestra?"
     answer, plain_msgs = plain_qa(question)
-    answer, jug_msgs, ent_msgs, qa_msgs, doc = question_answering(question)
+    answer, ent_msgs, qa_msgs, doc = question_answering(question)
     print(answer)
-    # print(jug_msgs)
     # print(ent_msgs)
     # print(qa_msgs)
     breakpoint()
+
