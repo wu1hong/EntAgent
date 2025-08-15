@@ -132,8 +132,6 @@ def process_triviaqa():
 def process_popqa():
     text_dict = {}  # {title: text}
     folder_path = "./PopQA/evidence/wikipedia"
-
-    # Step 1: Load Wikipedia texts
     for root, dirs, files in os.walk(folder_path):
         for file in files:
             if file.endswith('.txt'):
@@ -147,7 +145,7 @@ def process_popqa():
 
     print(f" Loaded {len(text_dict)} valid Wikipedia articles")
 
-    # Step 2: Build BM25 index
+    # Build BM25 index
     stemmer = Stemmer.Stemmer("english")
     corpus_tokens = bm25s.tokenize(text_dict.values(), stopwords="en", stemmer=stemmer)
     retriever = bm25s.BM25()
@@ -156,7 +154,7 @@ def process_popqa():
     os.makedirs(bm25_dir, exist_ok=True)
     retriever.save(bm25_dir)
 
-    # Step 3: Build Dense Embedding Index
+    # Build Dense Embedding Index
     dense_dir = os.path.join("./PopQA/", "dense_index")
     os.makedirs(dense_dir, exist_ok=True)
 
@@ -182,11 +180,11 @@ def process_popqa():
         os.path.join(dense_dir, "popqa_text_data"),
     )
 
-    # Step 4: Save text_dict
+    # Save text_dict
     with open("./PopQA/text_dict.json", "w", encoding="utf-8") as f:
         json.dump(text_dict, f, indent=4)
 
-    # Step 5: Add "topic_entity" field to JSONL
+    # Add "topic_entity" field to JSONL
     file_path = "./PopQA/test.jsonl"
     updated_entries = []
     with open(file_path, "r", encoding="utf-8") as f:
