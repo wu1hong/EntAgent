@@ -16,8 +16,9 @@ CONFIG_PATH = os.path.join(".", "config.toml")
 with open(CONFIG_PATH, "r") as f:
     config = toml.load(f)
 DATASET = config["exp"]["dataset"]
-MODEL_NAME = "BAAI/bge-large-en-v1.5"
+MODEL_NAME = config["dense_model"]["dense_name"]
 DEVICE = "cuda:0"
+Data = DATASET.lower()
 
 
 class WIKIDATA_ENTITY:
@@ -167,29 +168,35 @@ def search_entity_from_wikipedia(query: str, topk: int = 3, num_sentences: int =
 class DenseRetriever:
     def __init__(self, index_dir: str, dict_path: str):
         self.index = svs.Vamana(
-            os.path.join(index_dir, "triviaqa_text_config"),
-            svs.GraphLoader(os.path.join(index_dir, "triviaqa_text_graph")),
+            os.path.join(index_dir, f"{Data}_text_config"),
+            svs.GraphLoader(os.path.join(index_dir, f"{Data}_text_graph")),
             svs.VectorDataLoader(
-                os.path.join(index_dir, "triviaqa_text_data"), svs.DataType.float32
+                os.path.join(index_dir, f"{Data}_text_data"), svs.DataType.float32
             ),
             svs.DistanceType.L2,
-            num_threads = 4,
+            num_threads=4,
         )
         self.index.search_window_size = 30
         self.encoder = FlagModel(MODEL_NAME, use_fp16=False, device=DEVICE)
         with open(dict_path, 'r') as f:
             self.text_dict = json.load(f)
         self.titles = list(self.text_dict.keys())
-    
-    def search(self, query: str, topk: int = 10):
+
+    def search(self, query: str, topk: int = 10) -> List[WIKIDATA_ENTITY]:
         query_embedding = self.encoder.encode(query)
         indices, _ = self.index.search(query_embedding, topk)
         titles = [self.titles[index] for index in indices[0]]
         documents = [self.text_dict[title] for title in titles]
-        descriptions = [self.text_dict[title].split("\n\n")[0] for title in titles]
-        res_list = [WIKIDATA_ENTITY(None, title, description, doc=doc) for title, description, doc in zip(titles, descriptions, documents)]
-        return res_list
 
+        if Data == "popqa":
+            descriptions = [doc[:200] for doc in documents]
+        else:
+            descriptions = [self.text_dict[title].split("\n\n")[0] for title in titles]
+
+        return [
+            WIKIDATA_ENTITY(None, title, description, doc=doc)
+            for title, description, doc in zip(titles, descriptions, documents)
+        ]
 
 class BM25Retriever:
     def __init__(self, index_dir: str, dict_path: str):
@@ -216,17 +223,26 @@ class BM25Retriever:
         titles = [self.titles[idx] for idx in title_indices[0]]
         # titles = [self.titles[res] for res in results[0]]
         documents = [self.text_dict[title] for title in titles]
-        descriptions = [self.text_dict[title].split("\n\n")[0] for title in titles]
-        res_list = [WIKIDATA_ENTITY(None, title, description, doc=doc) for title, description, doc in zip(titles, descriptions, documents)]
-        return res_list
+
+        if Data == "popqa":
+            descriptions = [doc[:200] for doc in documents]
+        else:
+            descriptions = [self.text_dict[title].split("\n\n")[0] for title in titles]
+
+        return [
+            WIKIDATA_ENTITY(None, title, description, doc=doc)
+            for title, description, doc in zip(titles, descriptions, documents)
+        ]
 
 
-if DATASET == "TriviaQA":
-    dense_index_dir = os.path.join(".", "data", "TriviaQA", "dense_index")
-    bm25_index_dir = os.path.join(".", "data", "TriviaQA", "bm25_index")
-    dict_path = os.path.join(".", "data", "TriviaQA", "text_dict.json")
-    dense_retriever = DenseRetriever(dense_index_dir, dict_path)
-    bm25_retriever = BM25Retriever(bm25_index_dir, dict_path)
+
+dense_index_dir = f"./{DATASET}/dense_index"
+bm25_index_dir = f"./{DATASET}/bm25_index"
+dict_path = f"./{DATASET}/text_dict.json"
+
+dense_retriever = DenseRetriever(dense_index_dir, dict_path)
+bm25_retriever = BM25Retriever(bm25_index_dir, dict_path)
+
 
 
 def search_entity_from_dense(query: str, topk: int = 10) -> list[WIKIDATA_ENTITY]:
