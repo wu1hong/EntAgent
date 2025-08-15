@@ -3,15 +3,21 @@ from utils import WIKIDATA_ENTITY, search_entity_from_wikidata, search_entity_fr
 import re, os, toml
 from typing import List
 from pprint import pprint
-from prompts import *
 import tiktoken
 
+import os
+os.environ.pop("SSL_CERT_FILE", None)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(SCRIPT_DIR, "config.toml")
 with open(CONFIG_PATH, "r") as f:
     config = toml.load(f)
+DATASET = config["exp"]["dataset"]
 
+if DATASET.lower() == "popqa":
+    from prompts1 import *
+else:
+    from prompts import *
 openai_api_key = config["openai"]["api_key"]
 openai_api_base = config["openai"]["api_base"]
 MODEL = config["model"]["name"]
@@ -164,15 +170,36 @@ def entity_linking(sentence: str, if_dense: bool = False):
     query_msg = add_question(MSGS, sentence)
     response = llm_generate(query_msg)
     search_entity = parser(response)
+    print(f"[DEBUG] Extracted entity names: {search_entity}")
+
     # sanity check
-    if len(search_entity) > 10:
+    if len(search_entity) > 3:
         raise ValueError(f"Too many entities: {search_entity}")
     
+    # result_list = []
+    # if search_entity is not None:
+    #     for each in search_entity:
+    #         _list = search_func(each, topk=5, if_dense=if_dense) # List[WIKIDATA_ENTITY]
+    #         print(f"[DEBUG] Search for '{each}' returned {[e.label for e in _list]}")
+    #         result_list.extend(_list)
+    MAX_TOTAL_ENTS = 5
     result_list = []
+    seen_labels = set()
+
     if search_entity is not None:
         for each in search_entity:
-            _list = search_func(each, topk=TOPK, if_dense=if_dense) # List[WIKIDATA_ENTITY]
-            result_list.extend(_list)
+            if len(result_list) >= MAX_TOTAL_ENTS:
+                break
+
+            _list = search_func(each, topk=3, if_dense=if_dense)
+
+            for ent in _list:
+                if ent.label in seen_labels:
+                    continue
+                result_list.append(ent)
+                seen_labels.add(ent.label)
+                if len(result_list) >= MAX_TOTAL_ENTS:
+                    break
 
     # filter out results without description
     # result_list = [e for e in result_list if e.desc is not None]
