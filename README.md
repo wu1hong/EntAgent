@@ -28,11 +28,11 @@ Use the following command to preprocess datasets under the ```data``` folder
 
 ## Citation
 If you use our code in your research, please cite our work:
-'''
+```
 @article{luo2025entity,
   title={An Entity Linking Agent for Question Answering},
   author={Luo, Yajie and Wu, Yihong and Li, Muzhi and Mo, Fengran and Sun, Jia Ao and Wang, Xinyu and Ma, Liheng and Zhang, Yingxue and Nie, Jian-Yun},
   journal={arXiv preprint arXiv:2508.03865},
   year={2025}
 }
-'''
+```
