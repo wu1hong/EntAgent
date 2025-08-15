@@ -1,5 +1,5 @@
 # EntAgent
-
+```This repository contains the dataset and code for evaluating our proposed Entity Linking Agent for Question Answering (QA), introduced in the paper "An Entity Linking Agent for Question Answering" by Yajie Luo, Yihong Wu.```
 ## Install
 Run command ```pip install -r requirements.txt``` to install necessary libraries.
 Use the following command to install [ScalableVectorSearch](https://github.com/intel/ScalableVectorSearch), a vector search library and a replacement for Faiss.
@@ -15,17 +15,19 @@ pip install bindings/python
 ## Data Preprocess
 Use the following command to download datasets:
 
-```bash 2wiki_download.sh```
-```triviaqa_download.sh```
+```bash data/2wiki_download.sh```
+```bash data/triviaqa_download.sh```
 
 Use the following command to preprocess datasets under the ```data``` folder
 
 ```python preprocess.py```
 
+
 ## Inference
 1. Modify the ```config.toml``` file in ```ent_agent``` folder
 2. Launch vLLM with command ```bash serve.sh```
-3. Run command ```python main.py```
+3. Run command ```python main.py``` for entity linking task
+4. Run command```python main_qa.py``` for QA evaluation
 
 ## Citation
 If you use our code in your research, please cite our work:
