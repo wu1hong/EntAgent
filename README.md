@@ -1,5 +1,5 @@
 # EntAgent
-```This repository contains the dataset and code for evaluating our proposed Entity Linking Agent for Question Answering (QA), introduced in the paper "An Entity Linking Agent for Question Answering" by Yajie Luo, Yihong Wu.```
+This repository contains the dataset and code for evaluating our proposed Entity Linking Agent for Question Answering (QA), introduced in the paper ["An Entity Linking Agent for Question Answering"](https://arxiv.org/abs/2508.03865) by Yajie Luo, Yihong Wu.
 ## Install
 Run command ```pip install -r requirements.txt``` to install necessary libraries.
 Use the following command to install [ScalableVectorSearch](https://github.com/intel/ScalableVectorSearch), a vector search library and a replacement for Faiss.
