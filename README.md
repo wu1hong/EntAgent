@@ -26,7 +26,7 @@ Use the following command to preprocess datasets under the ```data``` folder
 2. Launch vLLM with command ```bash serve.sh```
 3. Run command ```python main.py```
 
-##Citation
+## Citation
 If you use our code in your research, please cite our work:
 
 @article{luo2025entity,
