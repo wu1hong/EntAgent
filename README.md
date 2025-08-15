@@ -16,6 +16,7 @@ pip install bindings/python
 Use the following command to download datasets:
 
 ```bash 2wiki_download.sh```
+```triviaqa_download.sh```
 
 Use the following command to preprocess datasets under the ```data``` folder
 
