@@ -7,9 +7,8 @@ We recommend using a Python 3.9+ environment:
 conda create -n ELA python=3.9
 conda activate ELA
 pip install -r requirements.txt
-Use the following command to install [ScalableVectorSearch](https://github.com/intel/ScalableVectorSearch), a vector search library and a replacement for Faiss.
-
 ```
+Use the following command to install [ScalableVectorSearch](https://github.com/intel/ScalableVectorSearch), a vector search library and a replacement for Faiss.
 # Install SVS for indexing (feel free to install on your customized dir) 
 git clone https://github.com/intel/ScalableVectorSearch
 cd ScalableVectorSearch
