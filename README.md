@@ -6,23 +6,34 @@ We recommend using a Python 3.9+ environment:
 ```bash
 conda create -n ELA python=3.9
 conda activate ELA
-pip install -r requirements.txt```
-Use the following command to install [ScalableVectorSearch](https://github.com/intel/ScalableVectorSearch), a vector search library and a replacement for Faiss.
-# Install SVS for indexing (feel free to install on your customized dir) 
-```git clone https://github.com/intel/ScalableVectorSearch
-cd ScalableVectorSearch```
-# Install svs using pip (don't use uv pip)
-```pip install bindings/python```
+pip install -r requirements.txt
+```
+
+Use the following command to install [ScalableVectorSearch](https://github.com/intel/ScalableVectorSearch), a vector search library and a replacement for Faiss:
+
+```bash
+# Install SVS for indexing (feel free to install in your own directory)
+git clone https://github.com/intel/ScalableVectorSearch
+cd ScalableVectorSearch
+
+# Install SVS using pip (avoid using uv pip)
+pip install bindings/python
+```
 
 ## Data Preprocess
-Use the following command to download datasets:
 
-```bash data/2wiki_download.sh```
-```bash data/triviaqa_download.sh```
+Use the following commands to download datasets:
 
-Use the following command to preprocess datasets under the ```data``` folder
+```bash
+bash data/2wiki_download.sh
+bash data/triviaqa_download.sh
+```
 
-```python preprocess.py```
+Then preprocess datasets under the `data/` folder:
+
+```bash
+python preprocess.py
+```
 
 
 ## Inference
