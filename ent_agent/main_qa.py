@@ -10,6 +10,7 @@ from typing import Dict, List
 from question_answering import question_answering
 from question_answering import plain_qa
 import toml
+from utils import bm25_retriever
 
 def normalize_answer(s):
 
@@ -82,7 +83,6 @@ def process_triviaqa(sample):
     answers = sample["Answer"]["NormalizedAliases"] + [sample["Answer"]["NormalizedValue"]]
     pred_ans, ent_msgs, qa_msgs, doc = question_answering(question)
     em, f1, _, _ = update_answer(pred_ans, answers)
-    from utils import bm25_retriever
     try:
         gold_doc_list = sample["EntityPages"]
         title_list = [each["Title"] for each in gold_doc_list]
@@ -117,7 +117,6 @@ def process_popqa(sample):
     print(f"EM: {em}, F1: {f1}, Pred: {pred_ans}, Gold: {answers}")
 
     try:
-        from utils2 import bm25_retriever, dense_retriever
         gold_doc = bm25_retriever.text_dict.get(gold_entity, "")
     except Exception as e:
         print(e)
