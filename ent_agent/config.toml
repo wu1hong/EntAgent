@@ -12,7 +12,7 @@ if_ft = false
 #name = "gpt-4.1"
 #name = "deepseek-chat"
 name = "llama3.1-8b-instruct"
-topk = 40
+topk = 35
 # ['wikidata', 'wikipedia', 'hybrid']
 source = 'hybrid'
 # ['baseline', 'BM25', 'dense', 'EL']
