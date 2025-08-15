@@ -3,21 +3,30 @@ api_key = "your-api-key"
 api_base = "http://localhost:8722/v1"
 # api_key = "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"
 # api_base = "https://api.openai.com/v1/responses"
+# api_key = "your-api-key"
+# api_base = "https://api.deepseek.com/v1"
 
 [model]
 # use finetuned model
 if_ft = false
-# name = "meta-llama/Llama-3.3-70B-Instruct"
-name = "meta-llama/Llama-3.1-8B-Instruct"
-# name = "/work/yihong/ckpt/checkpoint-1254"
-# name = "gpt-4.1"
-topk = 10
+#name = "gpt-4.1"
+#name = "deepseek-chat"
+name = "llama3.1-8b-instruct"
+topk = 40
 # ['wikidata', 'wikipedia', 'hybrid']
-source = 'wikipedia'
+source = 'hybrid'
+# ['baseline', 'BM25', 'dense', 'EL']
+method = 'BM25'
+
+
+[dense_model]
+dense_name = "BAAI/bge-large-en-v1.5"
+# dense_name = "intfloat/e5-large-v2"
+# dense_name = "BAAI/bge-base-en-v1.5"
 
 [exp]
-# dataset should be in ["2wiki", "WebQSP", "CWQ", "TriviaQA"]
-dataset = "CWQ"
+# dataset should be in ["2wiki", "WebQSP", "CWQ", "TriviaQA","PopQA"]
+dataset = "PopQA"
 # split should be in ["train", "dev", "test"]
 split = "dev"
 num_workers = 20
@@ -28,3 +37,4 @@ temp = 0.7
 top_p = 0.8
 max_tokens = 4096
 rep_penalty = 1.05
+
