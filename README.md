@@ -25,3 +25,13 @@ Use the following command to preprocess datasets under the ```data``` folder
 1. Modify the ```config.toml``` file in ```ent_agent``` folder
 2. Launch vLLM with command ```bash serve.sh```
 3. Run command ```python main.py```
+
+##Citation
+If you use our code in your research, please cite our work:
+
+@article{luo2025entity,
+  title={An Entity Linking Agent for Question Answering},
+  author={Luo, Yajie and Wu, Yihong and Li, Muzhi and Mo, Fengran and Sun, Jia Ao and Wang, Xinyu and Ma, Liheng and Zhang, Yingxue and Nie, Jian-Yun},
+  journal={arXiv preprint arXiv:2508.03865},
+  year={2025}
+}
