@@ -1,16 +1,15 @@
 import os
 import json
-from tqdm import tqdm
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from question_answering import question_answering
-import toml
 import random
 import re
 import string
+from tqdm import tqdm
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List
-from tenacity import retry, stop_after_attempt, wait_exponential
-
+from question_answering import question_answering
+from question_answering import plain_qa
+import toml
 
 def normalize_answer(s):
 
@@ -81,7 +80,7 @@ def update_answer(prediction, golds):
 def process_triviaqa(sample):
     question = sample["Question"]
     answers = sample["Answer"]["NormalizedAliases"] + [sample["Answer"]["NormalizedValue"]]
-    pred_ans, jug_msgs, ent_msgs, qa_msgs, doc = question_answering(question)
+    pred_ans, ent_msgs, qa_msgs, doc = question_answering(question)
     em, f1, _, _ = update_answer(pred_ans, answers)
     from utils import bm25_retriever
     try:
@@ -99,7 +98,39 @@ def process_triviaqa(sample):
         "hit@1": doc in gold_doc,
         "em": em,
         "f1": f1,
-        "jug_msgs": jug_msgs,
+        "ent_msgs": ent_msgs,
+        "qa_msgs": qa_msgs
+    }
+
+
+def process_popqa(sample):
+    question = sample["question"]
+    gold_entity = sample.get("s_wiki_title", "") or sample.get("topic_entity", [""])[0]
+    raw_answers = sample.get("possible_answers", "[]")
+    try:
+        answers = json.loads(raw_answers) if isinstance(raw_answers, str) else raw_answers
+    except Exception as e:
+        print(f"[ERROR] JSON decoding failed for answers: {raw_answers}")
+        answers = []
+    pred_ans, ent_msgs, qa_msgs, doc = question_answering(question)
+    em, f1, _, _ = update_answer(pred_ans, answers)
+    print(f"EM: {em}, F1: {f1}, Pred: {pred_ans}, Gold: {answers}")
+
+    try:
+        from utils2 import bm25_retriever, dense_retriever
+        gold_doc = bm25_retriever.text_dict.get(gold_entity, "")
+    except Exception as e:
+        print(e)
+        gold_doc = ""
+
+    return {
+        "_id": sample.get("id", ""),
+        "question": question,
+        "pred_ans": pred_ans,
+        "answers": answers,
+        "hit@1": gold_doc == doc,
+        "em": em,
+        "f1": f1,
         "ent_msgs": ent_msgs,
         "qa_msgs": qa_msgs
     }
@@ -114,14 +145,22 @@ if __name__ == "__main__":
     num_workers = config['exp']['num_workers']
     num_data = config['exp']['num_data']
     model = config['model']['name']
-    with open(f"./data/{dataset}/{split}.json", "r", encoding="utf-8") as f:
-        data = json.load(f)
     if dataset == "TriviaQA":
+        with open(f"./data/{dataset}/{split}.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
         process_sample = process_triviaqa
         data = data["Data"]
         # preserve data who have ['Answer']['MatchedWikiEntityName']
         data = [sample for sample in data if "Answer" in sample and "MatchedWikiEntityName" in sample["Answer"]]
         assert split == "dev" # for TriviaQA, we only use dev set
+    elif dataset == "PopQA":
+        input_path = "./PopQA/test.jsonl"
+        process_sample = process_popqa
+        with open(input_path, "r", encoding="utf-8") as f:
+            data = [json.loads(line) for line in f]
+    else:
+        raise ValueError("Unsupported dataset.")
+
     seed = 42
     random.seed(seed)
     try:
@@ -133,33 +172,39 @@ if __name__ == "__main__":
     running_em = 0
     running_f1 = 0
     running_hit1 = 0
-    res = process_sample(data[0])
+
+
     with ThreadPoolExecutor(max_workers=num_workers) as executor:
         futures = [executor.submit(process_sample, sample) for sample in data]
         for future in tqdm(as_completed(futures), total=len(data), desc="Processing samples"):
             try:
                 result = future.result()
-                results.append(result)
             except Exception as e:
-                print(e)
-                continue
+                print(f"[ERROR] Future failed: {e}")
+                continue 
             results.append(result)
             # Update running metrics
             running_em += (1 if result['em'] else 0)
             running_f1 += result['f1']
             running_hit1 += (1 if result['hit@1'] else 0)
+
+            
             current_count = len(results)
+            if current_count == 0:
+                continue 
             
             # Calculate current averages
             current_em = running_em / current_count
             current_f1 = running_f1 / current_count
             current_hit1 = running_hit1 / current_count
+
             print(f"\n==== Question: {result['question']} ====")
             print(f"Running EM: {current_em:.2%}")
             print(f"Running F1: {current_f1:.2%}")
             print(f"Running Hit@1: {current_hit1:.2%}")
-    
-    output_path = f"./results/{model}__{dataset}__{split}_{source}.json"
+
+
+    output_path = f"./result.json"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
