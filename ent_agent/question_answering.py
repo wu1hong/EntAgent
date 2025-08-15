@@ -7,7 +7,7 @@ from entity_linking import entity_linking
 from FlagEmbedding import FlagModel
 import torch
 import tiktoken
-from utils2 import search_entity_from_bm25, search_entity_from_dense
+from utils import search_entity_from_bm25, search_entity_from_dense
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(SCRIPT_DIR, "config.toml")
